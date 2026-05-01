@@ -3,7 +3,6 @@
 // Fast chat for simple queries, streamlined pipeline for complex
 // ============================================================
 
-import ZAI from 'z-ai-web-dev-sdk';
 import {
   Agent,
   AgentId,
@@ -18,6 +17,7 @@ import {
 } from './types';
 import { MemorySystem } from './memory';
 import { TreeOfThoughtsEngine } from './reasoning';
+import { chatCompletion } from './ai-client';
 
 // ─── Agent Definitions (streamlined) ─────────────────────────
 
@@ -53,7 +53,6 @@ function isSimpleChat(query: string): boolean {
 export class CognitiveCoordinator {
   private agents: Map<AgentId, Agent>;
   private memory: MemorySystem;
-  private zai: ZAI | null = null;
 
   constructor() {
     this.agents = new Map();
@@ -63,16 +62,8 @@ export class CognitiveCoordinator {
     this.memory = MemorySystem.getInstance();
   }
 
-  private async initLLM(): Promise<ZAI> {
-    if (!this.zai) {
-      this.zai = await ZAI.create();
-    }
-    return this.zai;
-  }
-
   private async callLLM(systemPrompt: string, userMessage: string, maxTokens = 1200): Promise<string> {
-    const zai = await this.initLLM();
-    const completion = await zai.chat.completions.create({
+    const completion = await chatCompletion({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
