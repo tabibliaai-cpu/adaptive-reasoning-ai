@@ -18,8 +18,8 @@ import {
   Zap,
   ShieldCheck,
   AlertTriangle,
-  Mirror,
-  ChevronDown,
+  ScanEye,
+  BarChart3,
   ChevronRight,
   Loader2,
   CheckCircle2,
@@ -33,7 +33,6 @@ import {
   RotateCcw,
   Sparkles,
   Terminal,
-  BarChart3,
   MessageSquare,
   PanelRightOpen,
   PanelRightClose,
@@ -44,7 +43,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import {
   Tooltip,
@@ -131,7 +129,7 @@ const AGENT_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
   executor: { icon: <Zap className="w-4 h-4" />, color: 'text-yellow-400' },
   verification: { icon: <ShieldCheck className="w-4 h-4" />, color: 'text-green-400' },
   critic: { icon: <AlertTriangle className="w-4 h-4" />, color: 'text-red-400' },
-  reflection: { icon: <Mirror className="w-4 h-4" />, color: 'text-pink-400' },
+  reflection: { icon: <ScanEye className="w-4 h-4" />, color: 'text-pink-400' },
 };
 
 const PHASE_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
@@ -142,7 +140,7 @@ const PHASE_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
   execution: { label: 'Executing Solution', icon: <Zap className="w-4 h-4" /> },
   verification: { label: 'Verifying Results', icon: <ShieldCheck className="w-4 h-4" /> },
   critique: { label: 'Running Critique', icon: <AlertTriangle className="w-4 h-4" /> },
-  reflection: { label: 'Reflecting & Learning', icon: <Mirror className="w-4 h-4" /> },
+  reflection: { label: 'Reflecting & Learning', icon: <ScanEye className="w-4 h-4" /> },
   completed: { label: 'Completed', icon: <CheckCircle2 className="w-4 h-4" /> },
 };
 
@@ -668,7 +666,7 @@ export default function Home() {
                       {[
                         { id: 'tree' as const, label: 'Strategies', icon: <TreePine className="w-3.5 h-3.5" /> },
                         { id: 'verification' as const, label: 'Verify', icon: <ShieldCheck className="w-3.5 h-3.5" /> },
-                        { id: 'reflection' as const, label: 'Reflect', icon: <Mirror className="w-3.5 h-3.5" /> },
+                        { id: 'reflection' as const, label: 'Reflect', icon: <ScanEye className="w-3.5 h-3.5" /> },
                       ].map((tab) => (
                         <button
                           key={tab.id}
@@ -917,13 +915,13 @@ export default function Home() {
                         {rightTab === 'reflection' && (
                           <>
                             <div className="flex items-center gap-2 mb-2">
-                              <Mirror className="w-4 h-4 text-pink-500" />
+                              <ScanEye className="w-4 h-4 text-pink-500" />
                               <h3 className="text-sm font-semibold">Reflection & Learning</h3>
                             </div>
 
                             {reflections.length === 0 && critiquePoints.length === 0 ? (
                               <div className="text-center py-8 text-muted-foreground">
-                                <Mirror className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                                <ScanEye className="w-8 h-8 mx-auto mb-2 opacity-30" />
                                 <p className="text-xs">Reflection insights will appear after the system completes its analysis.</p>
                               </div>
                             ) : (
