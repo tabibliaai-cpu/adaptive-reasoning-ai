@@ -4,14 +4,9 @@
 
 export type AgentId =
   | 'problem-understanding'
-  | 'root-cause-analyzer'
   | 'planner'
-  | 'architecture'
-  | 'coding'
-  | 'executor'
-  | 'verification'
-  | 'critic'
-  | 'reflection';
+  | 'solution-architect'
+  | 'verifier';
 
 export type AgentStatus = 'idle' | 'active' | 'completed' | 'failed' | 'waiting';
 

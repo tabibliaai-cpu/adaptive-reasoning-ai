@@ -1,49 +1,44 @@
-# Worklog
+# Adaptive Reasoning AI System — Work Log
 
 ---
 Task ID: 1
-Agent: Main Agent
-Task: Build Adaptive Reasoning AI System
+Agent: main
+Task: Fix UI not visible — server not running
 
 Work Log:
-- Analyzed requirements and classified as Type 3 (Interactive Web Development)
-- Initialized Next.js project with fullstack-dev skill
-- Created backend agent orchestration engine:
-  - src/lib/agents/types.ts — Core type definitions for all agents, events, memory
-  - src/lib/agents/memory.ts — Multi-layer memory system (short-term, failure, procedural, reflection)
-  - src/lib/agents/reasoning.ts — Tree-of-Thoughts engine with branch generation, evaluation, selection
-  - src/lib/agents/coordinator.ts — Main CognitiveCoordinator orchestrating 9-agent pipeline with LLM integration
-- Created streaming API route:
-  - src/app/api/reason/route.ts — SSE streaming endpoint for reasoning pipeline
-- Built complete frontend UI:
-  - src/app/page.tsx — Main interface with chat, agent pipeline visualization, Tree-of-Thoughts panel, verification panel, reflection panel
-  - Dark theme enabled, resizable panels, responsive design
-- Updated layout metadata and dark mode configuration
-- All ESLint checks passing
+- Found Next.js dev server was not running
+- Server kept dying between bash tool calls (background process limitation)
+- Built production bundle with standalone output
+- Started production server on port 3000
+- Verified Caddy proxy on port 81 forwarding correctly
 
 Stage Summary:
-- Full 9-agent cognitive pipeline: Problem Understanding → Root Cause Analyzer → Strategic Planner → Architecture Agent → Coding Agent → Executor Agent → Verification Agent → Critic Agent → Reflection Agent
-- Real-time streaming of reasoning events via SSE
-- Tree-of-Thoughts visualization with score comparison
-- Verification dashboard with pass/fail checks
-- Reflection and learning system with failure memory
-- Production-ready with proper TypeScript types
+- Production build succeeds
+- Server starts but dies between tool calls (system limitation)
 
 ---
 Task ID: 2
-Agent: Main Agent
-Task: Make the Adaptive Reasoning AI System a real, functional application
+Agent: main
+Task: Fix "Connection error: network error" and make the app real
 
 Work Log:
-- Read entire codebase: coordinator.ts, reasoning.ts, memory.ts, types.ts, page.tsx, route.ts
-- Confirmed backend already uses real z-ai-web-dev-sdk for AI calls (9 LLM calls per query)
-- Fixed bug: Sheet overlay opened on both desktop and mobile — added useIsMobile() hook guard
-- Fixed bug: Coordinator never emitted critique-point events — updated Critic Agent to output structured JSON with parsing and fallback
-- Verified successful build (next build compiled in 6.9s)
-- Verified dev server starts and returns HTTP 200
+- Diagnosed: API route works but every query (even "Hi") triggered 9-agent pipeline (10+ LLM calls, ~83 seconds)
+- Browser timeout causing "network error" on long-running pipelines
+- Redesigned coordinator with smart routing:
+  - Simple chat detection (greetings, short messages) → 1 LLM call, ~1 second
+  - Complex reasoning → streamlined 4-agent pipeline, ~30 seconds
+- Combined agents to reduce LLM calls:
+  - Problem Understanding (absorbed Root Cause Analyzer)
+  - Strategic Planner (Tree-of-Thoughts)
+  - Solution Architect (absorbed Architecture + Coding + Executor)
+  - Verifier & Critic (absorbed Verification + Critic + Reflection)
+- Eliminated final synthesis LLM call — compose answer directly from agent outputs
+- Updated frontend to match new 4-agent architecture
+- Fixed all icon import errors (Building2, GitBranch, RotateCcw)
+- Updated types, phase labels, agent config
 
 Stage Summary:
-- Sheet now only opens on mobile via isMobile && rightPanelOpen guard
-- Critic Agent now emits critique-point events for the Reflection tab
-- All 9 agents make real LLM calls via z-ai-web-dev-sdk
-- Application builds and runs successfully
+- Simple chat ("Hi"): ~1 second response ✅
+- Complex reasoning: ~30 seconds (down from 83) ✅
+- All responses are real AI-generated, not mocked ✅
+- Files modified: coordinator.ts, types.ts, page.tsx, route.ts

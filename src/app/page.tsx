@@ -13,8 +13,6 @@ import {
   Send,
   Brain,
   Search,
-  GitBranch,
-  Building2,
   Code2,
   Zap,
   ShieldCheck,
@@ -30,7 +28,6 @@ import {
   Lightbulb,
   TreePine,
   Eye,
-  RotateCcw,
   Sparkles,
   Terminal,
   MessageSquare,
@@ -128,29 +125,20 @@ interface Message {
 
 const AGENT_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
   'problem-understanding': { icon: <Search className="w-4 h-4" />, color: 'text-blue-400' },
-  'root-cause-analyzer': { icon: <GitBranch className="w-4 h-4" />, color: 'text-purple-400' },
-  planner: { icon: <TreePine className="w-4 h-4" />, color: 'text-emerald-400' },
-  architecture: { icon: <Building2 className="w-4 h-4" />, color: 'text-amber-400' },
-  coding: { icon: <Code2 className="w-4 h-4" />, color: 'text-cyan-400' },
-  executor: { icon: <Zap className="w-4 h-4" />, color: 'text-yellow-400' },
-  verification: { icon: <ShieldCheck className="w-4 h-4" />, color: 'text-green-400' },
-  critic: { icon: <AlertTriangle className="w-4 h-4" />, color: 'text-red-400' },
-  reflection: { icon: <ScanEye className="w-4 h-4" />, color: 'text-pink-400' },
+  'planner': { icon: <TreePine className="w-4 h-4" />, color: 'text-emerald-400' },
+  'solution-architect': { icon: <Code2 className="w-4 h-4" />, color: 'text-cyan-400' },
+  'verifier': { icon: <ShieldCheck className="w-4 h-4" />, color: 'text-green-400' },
 };
 
 const PHASE_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
-  understanding: { label: 'Understanding Problem', icon: <Search className="w-4 h-4" /> },
-  analysis: { label: 'Analyzing Root Causes', icon: <GitBranch className="w-4 h-4" /> },
-  'hypothesis-generation': { label: 'Generating Hypotheses', icon: <Brain className="w-4 h-4" /> },
-  planning: { label: 'Planning Architecture', icon: <Building2 className="w-4 h-4" /> },
-  execution: { label: 'Executing Solution', icon: <Zap className="w-4 h-4" /> },
-  verification: { label: 'Verifying Results', icon: <ShieldCheck className="w-4 h-4" /> },
-  critique: { label: 'Running Critique', icon: <AlertTriangle className="w-4 h-4" /> },
-  reflection: { label: 'Reflecting & Learning', icon: <ScanEye className="w-4 h-4" /> },
+  understanding: { label: 'Analyzing Problem', icon: <Search className="w-4 h-4" /> },
+  'hypothesis-generation': { label: 'Generating Strategies', icon: <Brain className="w-4 h-4" /> },
+  planning: { label: 'Building Solution', icon: <Code2 className="w-4 h-4" /> },
+  verification: { label: 'Verifying & Critiquing', icon: <ShieldCheck className="w-4 h-4" /> },
   completed: { label: 'Completed', icon: <CheckCircle2 className="w-4 h-4" /> },
 };
 
-const PHASE_ORDER = ['understanding', 'analysis', 'hypothesis-generation', 'planning', 'execution', 'verification', 'critique', 'reflection', 'completed'];
+const PHASE_ORDER = ['understanding', 'hypothesis-generation', 'planning', 'verification', 'completed'];
 
 // ─── Main Component ───────────────────────────────────────────
 
@@ -277,8 +265,12 @@ export default function Home() {
       }
 
       case 'final-answer': {
-        const { answer } = event.data as { answer: string };
+        const { answer, mode } = event.data as { answer: string; mode?: string };
         setFinalAnswer(answer);
+        // Track whether this was a chat or reasoning response
+        if (mode === 'chat') {
+          setCurrentPhase('completed');
+        }
         setMessages((prev) => [
           ...prev,
           { role: 'assistant', content: answer, timestamp: Date.now() },
@@ -368,7 +360,7 @@ export default function Home() {
   // ─── Computed ───────────────────────────────────────────────
 
   const completedAgents = Array.from(agents.values()).filter((a) => a.status === 'completed').length;
-  const totalAgents = 9;
+  const totalAgents = 4;
   const phaseIndex = PHASE_ORDER.indexOf(currentPhase);
   const progressPercent = Math.round(((phaseIndex + completedAgents / totalAgents) / PHASE_ORDER.length) * 100);
 
@@ -923,8 +915,8 @@ function WelcomeScreen({ setInput }: { setInput: (v: string) => void }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 w-full max-w-md sm:max-w-lg px-2">
         {[
           { icon: <Code2 className="w-4 h-4" />, text: 'Debug a failing build', query: 'Debug why my React app has memory leaks when navigating between pages' },
-          { icon: <Building2 className="w-4 h-4" />, text: 'Design architecture', query: 'Design a scalable microservices architecture for an e-commerce platform' },
-          { icon: <GitBranch className="w-4 h-4" />, text: 'Analyze root cause', query: 'Why is my GraphQL API returning null for deeply nested queries?' },
+          { icon: <Code2 className="w-4 h-4" />, text: 'Design architecture', query: 'Design a scalable microservices architecture for an e-commerce platform' },
+          { icon: <Search className="w-4 h-4" />, text: 'Analyze root cause', query: 'Why is my GraphQL API returning null for deeply nested queries?' },
           { icon: <Terminal className="w-4 h-4" />, text: 'Plan strategy', query: 'Plan the migration from monolith to serverless architecture step by step' },
         ].map((suggestion) => (
           <button
@@ -1109,7 +1101,7 @@ function InputArea({
         <div className="hidden sm:flex items-center gap-4 mt-2 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <Brain className="w-3 h-3" />
-            9-Agent Pipeline
+            Smart Routing
           </span>
           <span className="flex items-center gap-1">
             <TreePine className="w-3 h-3" />
@@ -1120,8 +1112,8 @@ function InputArea({
             Verification-First
           </span>
           <span className="flex items-center gap-1">
-            <RotateCcw className="w-3 h-3" />
-            Adaptive Learning
+            <Zap className="w-3 h-3" />
+            Real-time Streaming
           </span>
         </div>
       </div>
