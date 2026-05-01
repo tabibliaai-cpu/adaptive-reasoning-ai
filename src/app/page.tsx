@@ -5,6 +5,11 @@
 
 'use client';
 
+// Backend API URL — set NEXT_PUBLIC_API_URL env var to proxy to another backend.
+// Default: '' (use same origin, i.e. Netlify's own /api/*)
+// Example: 'https://preview-xxx.space.chatglm.site' (Z.ai sandbox)
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ReactMarkdown from 'react-markdown';
@@ -314,7 +319,7 @@ export default function Home() {
     abortRef.current = new AbortController();
 
     try {
-      const response = await fetch('/api/reason', {
+      const response = await fetch(`${API_BASE}/api/reason`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query }),
