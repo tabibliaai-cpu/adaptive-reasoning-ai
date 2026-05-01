@@ -1018,6 +1018,8 @@ function ProcessingIndicator({
                     ? 'bg-emerald-500/10 text-emerald-400'
                     : agent.status === 'completed'
                     ? 'text-emerald-500/60'
+                    : agent.status === 'failed'
+                    ? 'bg-red-500/10 text-red-400'
                     : 'text-muted-foreground'
                 }`}
               >
@@ -1025,6 +1027,8 @@ function ProcessingIndicator({
                   <Loader2 className="w-2.5 h-2.5 sm:w-3 sm:h-3 animate-spin" />
                 ) : agent.status === 'completed' ? (
                   <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                ) : agent.status === 'failed' ? (
+                  <XCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                 ) : (
                   <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border border-current" />
                 )}

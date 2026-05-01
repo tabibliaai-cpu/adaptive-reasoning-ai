@@ -61,22 +61,34 @@ export class CognitiveCoordinator {
 
   // ─── LLM Call Helper ────────────────────────────────────────
 
-  private async callLLM(systemPrompt: string, userMessage: string): Promise<string> {
+  private async callLLM(systemPrompt: string, userMessage: string, maxTokens = 1500, timeoutMs = 30000): Promise<string> {
     const zai = await this.initLLM();
-    try {
-      const completion = await zai.chat.completions.create({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userMessage },
-        ],
-        temperature: 0.7,
-        max_tokens: 4096,
-      });
-      return completion.choices[0]?.message?.content ?? 'No response generated.';
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      return `LLM Error: ${msg}`;
-    }
+    return Promise.race([
+      (async () => {
+        const completion = await zai.chat.completions.create({
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage },
+          ],
+          temperature: 0.7,
+          max_tokens: maxTokens,
+        });
+        const content = completion.choices[0]?.message?.content;
+        if (!content || content.trim().length === 0) {
+          throw new Error('LLM returned empty response');
+        }
+        return content;
+      })(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('LLM call timed out')), timeoutMs)
+      ),
+    ]);
+  }
+
+  // Truncate long outputs to keep context manageable and fast
+  private truncate(text: string, maxLen = 800): string {
+    if (text.length <= maxLen) return text;
+    return text.slice(0, maxLen) + '\n...[truncated]';
   }
 
   // ─── Streaming Helpers ──────────────────────────────────────
@@ -97,22 +109,31 @@ export class CognitiveCoordinator {
     agentId: AgentId,
     systemPrompt: string,
     userMessage: string,
+    maxTokens = 2048,
   ): Promise<string> {
     const agent = this.agents.get(agentId)!;
     agent.status = 'active';
     agent.startTime = Date.now();
     this.emitEvent(controller, 'agent-start', { agentId, name: agent.name, icon: agent.icon });
 
-    const output = await this.callLLM(systemPrompt, userMessage);
-
-    agent.status = 'completed';
-    agent.endTime = Date.now();
-    agent.output = output;
-    this.memory.addAgentOutput(agentId, output);
-    this.emitEvent(controller, 'agent-output', { agentId, output });
-    this.emitEvent(controller, 'agent-complete', { agentId, confidence: 0.85 + Math.random() * 0.15 });
-
-    return output;
+    try {
+      const output = await this.callLLM(systemPrompt, userMessage, maxTokens);
+      agent.status = 'completed';
+      agent.endTime = Date.now();
+      agent.output = output;
+      this.memory.addAgentOutput(agentId, output);
+      this.emitEvent(controller, 'agent-output', { agentId, output });
+      this.emitEvent(controller, 'agent-complete', { agentId, confidence: 0.85 + Math.random() * 0.15 });
+      return output;
+    } catch (error: unknown) {
+      agent.status = 'failed';
+      agent.endTime = Date.now();
+      const msg = error instanceof Error ? error.message : String(error);
+      const errorMsg = `Agent "${agent.name}" failed: ${msg}`;
+      this.emitEvent(controller, 'agent-output', { agentId, output: `Error: ${msg}` });
+      this.emitEvent(controller, 'error', { message: errorMsg });
+      throw new Error(errorMsg);
+    }
   }
 
   // ─── Main Reasoning Pipeline ────────────────────────────────
@@ -307,7 +328,7 @@ RESPOND WITH EXACTLY THIS JSON FORMAT (no markdown, just raw JSON):
     const architectureOutput = await this.runAgent(
       controller,
       'architecture',
-      `You are a senior Architecture Agent in a cognitive AI system. Design the solution architecture for the selected strategy.
+      `You are a senior Architecture Agent. Design the solution architecture for the selected strategy.
 
 ## Problem:
 ${query}
@@ -315,33 +336,21 @@ ${query}
 ## Selected Strategy:
 ${selectedBranch.label}: ${selectedBranch.hypothesis}
 
-## Strategy Evaluation:
-${evaluationSummary}
-
 ## Root Cause:
-${rootCauseOutput}
+${this.truncate(rootCauseOutput, 400)}
 
 RESPOND WITH EXACTLY THIS STRUCTURE:
 ## Solution Architecture
-[Describe the solution architecture]
+[Describe the solution architecture in 2-3 sentences]
 
 ## Components
-[List and describe each component]
+[List and describe each component briefly]
 
 ## Data Flow
 [How data moves through the system]
 
-## API Design
-[Key interfaces and endpoints]
-
-## Database Schema Impact
-[Any schema changes needed]
-
-## Scalability Considerations
-[How this scales]
-
-## Modularity Assessment
-[How modular and maintainable is this]
+## Key Design Decisions
+[Why each major decision was made]
 
 ## Risk Mitigation
 [How the identified risks are mitigated]`,
@@ -354,54 +363,47 @@ RESPOND WITH EXACTLY THIS STRUCTURE:
     const codingOutput = await this.runAgent(
       controller,
       'coding',
-      `You are an elite Coding Agent in a cognitive AI system. Generate production-grade code for the selected solution.
+      `You are an elite Coding Agent. Generate production-grade code for the selected solution.
 
 ## Problem:
 ${query}
 
 ## Solution Architecture:
-${architectureOutput}
+${this.truncate(architectureOutput, 500)}
 
 ## Selected Strategy:
 ${selectedBranch.label}: ${selectedBranch.hypothesis}
 
-RESPOND WITH EXACTLY THIS STRUCTURE:
 ## Implementation Plan
 [Step-by-step implementation approach]
 
 ## Code Solution
 \`\`\`typescript
-// Production-grade implementation
-// Include error handling, type safety, and documentation
+// Production-grade implementation with error handling and type safety
 \`\`\`
 
 ## Key Design Decisions
 [Why each major decision was made]
 
-## Error Handling Strategy
-[How errors are handled]
-
 ## Testing Recommendations
-[What tests should be written]
-
-## Future Considerations
-[What should be planned for future iterations]`,
+[What tests should be written]`,
       query,
     );
 
-    // ─── PHASE 6: Execution Simulation ────────────────────────
+    // ─── PHASE 6: Execution + Verification ─────────────────────
+    this.setPhase(controller, 'verification');
+
     const executorOutput = await this.runAgent(
       controller,
       'executor',
-      `You are an Executor Agent that simulates execution and analyzes the generated solution.
+      `You are an Executor Agent that simulates execution and verifies the generated solution.
 
 ## Generated Code:
-${codingOutput}
+${this.truncate(codingOutput, 600)}
 
 ## Problem:
 ${query}
 
-RESPOND WITH EXACTLY THIS STRUCTURE:
 ## Execution Simulation
 [Describe what would happen when this code runs]
 
@@ -411,17 +413,8 @@ RESPOND WITH EXACTLY THIS STRUCTURE:
 ## Performance Analysis
 [Time/space complexity analysis]
 
-## Dependency Check
-[Required dependencies and their versions]
-
-## Integration Points
-[Where this integrates with existing systems]
-
 ## Potential Runtime Issues
-[What could go wrong at runtime]
-
-## Recommended Configuration
-[Environment variables, settings needed]`,
+[What could go wrong at runtime]`,
       query,
     );
 
@@ -431,63 +424,34 @@ RESPOND WITH EXACTLY THIS STRUCTURE:
     const verificationOutput = await this.runAgent(
       controller,
       'verification',
-      `You are a Verification Agent — the MOST CRITICAL agent. You must NEVER assume success without thorough checking.
+      `You are a Verification Agent. Check the solution thoroughly — NEVER assume success.
 
-## Original Problem:
-${query}
-
-## Generated Solution:
-${codingOutput}
-
-## Execution Analysis:
-${executorOutput}
-
-## Solution Architecture:
-${architectureOutput}
+## Problem: ${query}
+## Solution: ${this.truncate(codingOutput, 500)}
+## Execution Analysis: ${this.truncate(executorOutput, 300)}
 
 RESPOND WITH EXACTLY THIS STRUCTURE:
-## Verification Checklist
-
 ### Correctness
-- [ ] Solution addresses the stated problem
-- [ ] Code is syntactically correct
-- [ ] Logic is sound
 Assessment: [PASS|FAIL|PARTIAL]
 Notes: [details]
 
 ### Completeness
-- [ ] All requirements covered
-- [ ] Edge cases handled
-- [ ] Error handling implemented
 Assessment: [PASS|FAIL|PARTIAL]
 Notes: [details]
 
 ### Scalability
-- [ ] Solution scales appropriately
-- [ ] No performance bottlenecks
 Assessment: [PASS|FAIL|PARTIAL]
 Notes: [details]
 
 ### Maintainability
-- [ ] Code is readable and documented
-- [ ] Follows best practices
-- [ ] Modular design
 Assessment: [PASS|FAIL|PARTIAL]
 Notes: [details]
 
 ### Integration
-- [ ] Compatible with existing systems
-- [ ] Dependencies are available
 Assessment: [PASS|FAIL|PARTIAL]
 Notes: [details]
 
-## Overall Assessment: [PASS|FAIL|PARTIAL]
-
-## Critical Issues
-[If any]
-
-## Recommendations
-[What should be improved]`,
+## Overall Assessment: [PASS|FAIL|PARTIAL]`,
       query,
     );
 
@@ -520,35 +484,16 @@ Notes: [details]
     const criticOutput = await this.runAgent(
       controller,
       'critic',
-      `You are an adversarial Critic Agent. Your job is to CHALLENGE and FIND WEAKNESSES in the solution.
+      `You are an adversarial Critic Agent. CHALLENGE and FIND WEAKNESSES in the solution.
 
-## Problem:
-${query}
-
-## Solution:
-${codingOutput}
-
-## Verification Report:
-${verificationReport.summary}
-
-## Verification Checks:
-${verificationChecks.map(c => `- ${c.name}: ${c.result.toUpperCase()} — ${c.details}`).join('\n')}
+## Problem: ${query}
+## Solution: ${this.truncate(codingOutput, 300)}
+## Verification: ${verificationReport.summary}
 
 RESPOND WITH EXACTLY THIS JSON FORMAT (no markdown, just raw JSON):
-{
-  "critiquePoints": [
-    {
-      "id": "cp-1",
-      "severity": "critical|warning|info",
-      "category": "Category Name",
-      "description": "Description of the issue",
-      "recommendation": "Specific recommendation to fix it"
-    }
-  ],
-  "summary": "Overall critique summary paragraph"
-}
+{"critiquePoints":[{"id":"cp-1","severity":"critical|warning|info","category":"Category","description":"Issue description","recommendation":"Fix recommendation"}],"summary":"Overall critique summary"}
 
-Generate at least 3 critique points covering different severity levels.`,
+Generate 3 critique points with different severity levels.`,
       query,
     );
 
@@ -586,47 +531,21 @@ Generate at least 3 critique points covering different severity levels.`,
     const reflectionOutput = await this.runAgent(
       controller,
       'reflection',
-      `You are a Reflection Agent — the learning engine of this cognitive system. Analyze the entire reasoning process.
+      `You are a Reflection Agent. Analyze the reasoning process.
 
-## Original Problem:
-${query}
+## Problem: ${query}
+## Selected Strategy: ${selectedBranch.label}
+## Verification: ${overallResult.toUpperCase()} — ${verificationReport.summary}
+## Strategies Explored: ${branches.map(b => `- ${b.label} (${b.status})`).join('\n')}
 
-## Strategies Explored:
-${branches.map(b => `- ${b.label} (${b.status}): ${b.hypothesis}`).join('\n')}
-
-## Selected Strategy:
-${selectedBranch.label}
-
-## Verification Result:
-${overallResult.toUpperCase()} — ${verificationReport.summary}
-
-## Critique Summary:
-${criticOutput.slice(0, 800)}
-
-## Failed Approaches to Remember:
-${branches.filter(b => b.status === 'rejected').map(b => `- ${b.label}: ${b.reasoning}`).join('\n')}
-
-RESPOND WITH EXACTLY THIS STRUCTURE:
 ## Process Analysis
 [How well did the reasoning process work?]
 
 ## Key Insights
-[What was learned from this session?]
+[What was learned?]
 
-## Failed Assumptions
-[What assumptions were incorrect?]
-
-## Strategy Effectiveness
-[Which strategies worked and which didn't?]
-
-## Process Improvements
-[How could the reasoning process be improved?]
-
-## Knowledge Gained
-[What new knowledge was acquired?]
-
-## Recommendations for Future Sessions
-[What should the system do differently?]`,
+## Recommendations for Future
+[What should be done differently?]`,
       query,
     );
 
@@ -670,30 +589,28 @@ Format your response with clear sections, code blocks, and actionable recommenda
 ${query}
 
 ## Problem Understanding:
-${problemOutput}
+${this.truncate(problemOutput, 300)}
 
 ## Root Cause Analysis:
-${rootCauseOutput}
+${this.truncate(rootCauseOutput, 300)}
 
 ## Selected Strategy (${selectedBranch.label}):
 ${selectedBranch.hypothesis}
 
 ## Solution Architecture:
-${architectureOutput}
+${this.truncate(architectureOutput, 300)}
 
 ## Generated Solution:
-${codingOutput}
+${this.truncate(codingOutput, 500)}
 
 ## Verification Result: ${overallResult.toUpperCase()}
 ${verificationChecks.map(c => `- ${c.name}: ${c.result.toUpperCase()}`).join('\n')}
 
-## Critique Highlights:
-${criticOutput.slice(0, 1000)}
-
 ## Key Insights:
-${reflectionOutput.slice(0, 500)}
+${this.truncate(reflectionOutput, 300)}
 
-Generate a comprehensive, polished response that addresses the user's problem with the full reasoning trace.`
+Generate a comprehensive, polished response that addresses the user's problem.`,
+      4096,
     );
 
     // Record session
