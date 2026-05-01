@@ -534,32 +534,51 @@ ${verificationReport.summary}
 ## Verification Checks:
 ${verificationChecks.map(c => `- ${c.name}: ${c.result.toUpperCase()} — ${c.details}`).join('\n')}
 
-RESPOND WITH EXACTLY THIS STRUCTURE:
-## Critical Weaknesses
-[What are the most serious issues?]
+RESPOND WITH EXACTLY THIS JSON FORMAT (no markdown, just raw JSON):
+{
+  "critiquePoints": [
+    {
+      "id": "cp-1",
+      "severity": "critical|warning|info",
+      "category": "Category Name",
+      "description": "Description of the issue",
+      "recommendation": "Specific recommendation to fix it"
+    }
+  ],
+  "summary": "Overall critique summary paragraph"
+}
 
-## Technical Debt Assessment
-[What technical debt does this introduce?]
-
-## Future Failure Scenarios
-[When and how could this solution fail?]
-
-## Security Concerns
-[Are there security vulnerabilities?]
-
-## Performance Under Stress
-[How does this perform under heavy load?]
-
-## Missing Considerations
-[What was overlooked?]
-
-## Adversarial Test Cases
-[Test cases that could break this solution]
-
-## Improvement Recommendations
-[Specific, actionable improvements ordered by priority]`,
+Generate at least 3 critique points covering different severity levels.`,
       query,
     );
+
+    // Parse and emit critique points
+    try {
+      const critiqueMatch = criticOutput.match(/\{[\s\S]*\}/);
+      if (critiqueMatch) {
+        const critiqueData = JSON.parse(critiqueMatch[0]);
+        const points: CritiquePoint[] = (critiqueData.critiquePoints || []).map((p: Partial<CritiquePoint>, i: number) => ({
+          id: p.id || `cp-${Date.now()}-${i}`,
+          severity: p.severity || 'warning',
+          category: p.category || 'General',
+          description: p.description || 'Issue identified',
+          recommendation: p.recommendation || 'Review and address',
+        }));
+        for (const point of points) {
+          this.emitEvent(controller, 'critique-point', point);
+        }
+      }
+    } catch {
+      // Fallback critique points if JSON parsing fails
+      const fallbackPoints: CritiquePoint[] = [
+        { id: 'cp-fb-1', severity: 'info', category: 'General', description: 'Solution has been generated but requires manual review for production readiness.', recommendation: 'Review the generated code thoroughly before deployment.' },
+        { id: 'cp-fb-2', severity: 'warning', category: 'Testing', description: 'Automated tests should be written to validate the solution under various conditions.', recommendation: 'Write unit and integration tests covering the main use cases and edge cases.' },
+        { id: 'cp-fb-3', severity: 'info', category: 'Documentation', description: 'Ensure documentation is updated to reflect the changes made by this solution.', recommendation: 'Update relevant documentation, API docs, and README files.' },
+      ];
+      for (const point of fallbackPoints) {
+        this.emitEvent(controller, 'critique-point', point);
+      }
+    }
 
     // ─── PHASE 9: Reflection ─────────────────────────────────
     this.setPhase(controller, 'reflection');

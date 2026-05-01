@@ -6,6 +6,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import ReactMarkdown from 'react-markdown';
 import {
   Bot,
@@ -170,6 +171,7 @@ export default function Home() {
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [rightTab, setRightTab] = useState<'tree' | 'verification' | 'reflection'>('tree');
 
+  const isMobile = useIsMobile();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -888,7 +890,7 @@ export default function Home() {
           </div>
 
           {/* Mobile Sheet for Analysis Panel */}
-          <Sheet open={rightPanelOpen} onOpenChange={setRightPanelOpen}>
+          <Sheet open={isMobile && rightPanelOpen} onOpenChange={setRightPanelOpen}>
             <SheetContent side="bottom" className="h-[80dvh] rounded-t-xl p-0">
               <SheetHeader className="sr-only">
                 <SheetTitle>Analysis Panel</SheetTitle>
