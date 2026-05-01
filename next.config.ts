@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  output: "standalone",
-  /* config options here */
+  // "standalone" is for self-hosted Node.js servers.
+  // Netlify uses serverless functions — omit output mode.
   typescript: {
     ignoreBuildErrors: true,
   },

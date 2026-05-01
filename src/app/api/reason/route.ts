@@ -6,6 +6,9 @@
 import { NextRequest } from 'next/server';
 import { CognitiveCoordinator } from '@/lib/agents/coordinator';
 
+// Netlify: extend serverless function timeout (max 26s on Pro, 10s on free)
+export const maxDuration = 60;
+
 // Create a new coordinator per request to avoid state leakage
 function createCoordinator(): CognitiveCoordinator {
   return new CognitiveCoordinator();
